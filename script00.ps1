@@ -7,29 +7,38 @@
 Запустить "CSP\csptest.exe -absorb -certs"
 #>
 
-#OU for PC
-[string]$LDAPSearchBasePC = "OU=Buch-PC,OU=Buch,OU=UMU,DC=mmc,DC=local"
-#OU for users
-[string]$LDAPSearchBaseUsers = "OU=Buch-Users,OU=Buch,OU=UMU,DC=mmc,DC=local"
-#PC name
+# DomainName
+$DomainName = Get-ADDomain | Select-Object DistinguishedName -ExpandProperty DistinguishedName
+
+# Group Name
+$GroupName = "Kontur-Users"
+
+# Array with PC names
+$PCnames = Get-ADComputer -LDAPFilter "(name=*)" -SearchBase $LDAPSearchBasePC | Select-Object DNSHostName -ExpandProperty DNSHostName
+# PC name
 [string]$PCname = $env:COMPUTERNAME
-#Username
-[string]$User = $null
-#SID
-[string]$SID = $null
+
+# Array with SIDs
+$UserSIDs = $null
+$UserSIDs = Get-ADGroup -LDAPFilter "(Name=$GroupName)" | Get-ADGroupMember | Select-Object SID -ExpandProperty SID | Select-Object Value -ExpandProperty Value
+
+# Single SID
+# [string]$SID = $null
+[string]$SID = (Get-ADUser -Filter {SamAccountName -eq "Administrator"}).SID
 [string]$CSPpath = "C:\Program Files\Crypto Pro\CSP\"
-[string]$RegistryPath = $null
 
 # Root reg path for key containers
 [string]$RegRoot
 IF ((Get-WmiObject Win32_OperatingSystem -ComputerName $PCname).OSArchitecture -like "64*") {
-    [string]$RegRoot = "HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Crypto Pro\Settings\Users\"
+    # Path to regkeys on x64
+    $RegRoot = "HKLM:SOFTWARE\Wow6432Node\Crypto Pro\Settings\Users\"
     } ELSE {
-        [string]$RegRoot = "HKEY_LOCAL_MACHINE\SOFTWARE\Crypto Pro\Settings\Users\"
+        # and x86
+        $RegRoot = "HKLM:SOFTWARE\Crypto Pro\Settings\Users\"
         }
-# For x64
-#HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Crypto Pro\Settings\Users\ + SID + \Keys
-# For x86
-#HKEY_LOCAL_MACHINE\SOFTWARE\Crypto Pro\Settings\Users\ + SID + \Keys
-[string]$RegKey = $null
 
+# End of path
+$Keys = "\Keys"
+
+# Full hive
+$KeyHive = $RegRoot + $SID + $Keys

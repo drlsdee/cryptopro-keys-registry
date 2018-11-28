@@ -13,26 +13,54 @@
 Назначение сертификатов (наименование сервиса - СУФД, Контур итп; наименование или иной ИД владельца; возможно, стоит связать с названием групп)
 Компьютеры (при распространении через SCCM - обойтись коллекциями?)
 #>
+# Set input parameters
+param (
+        # Название сервиса, для которого используются ключи. "СУФД", "ЕИС", "Контур" и т.п. Должно содержаться как в названии контейнера, так и в названии группы.
+        $ServiceName,
+        # Имя ПК-источника. Если не задано, должен использоваться локальный компьютер.
+        $SourcePC,
+        # Логин учетной записи-источника. Если не задано, текущий пользователь.
+        $SourceUser
+        )
+
+# Read the service name
+IF ($ServiceName -eq $null) {
+    $ServiceName = Read-Host "Enter service name here"
+    }
+
+# Read the name of the source PC
+IF ($SourcePC -eq $null) {
+    $SourcePC = $env:COMPUTERNAME
+    }
+
+# Read the name of the source user
+IF ($SourceUser -eq $null) {
+    $SourceUser = $env:USERNAME
+    }
+
 
 # DomainName
 $DomainName = Get-ADDomain | Select-Object DistinguishedName -ExpandProperty DistinguishedName
 
 # Group Name
-$GroupName = "Kontur-Users"
+[string]$GroupName = "*" + $ServiceName + "*"
 
-# Array with PC names
-$PCnames = Get-ADComputer -LDAPFilter "(name=*)" -SearchBase $DomainName | Select-Object DNSHostName -ExpandProperty DNSHostName
-# PC name
-[string]$PCname = $env:COMPUTERNAME
+# Path to csptest.exe
+$CSPpath = "C:\Program Files\Crypto Pro\CSP"
+# Add to environment variable PATH
+$env:PATH = $env:PATH + ";" + $CSPpath
+
+# Array with target PC names
+$PCnames = $null
+$PCnames = Get-ADGroup -LDAPFilter "(Name=$GroupName)" | Get-ADGroupMember | Where-Object -Property objectClass -eq computer | Select-Object name -ExpandProperty name
 
 # Array with SIDs
 $UserSIDs = $null
-$UserSIDs = Get-ADGroup -LDAPFilter "(Name=$GroupName)" | Get-ADGroupMember | Select-Object SID -ExpandProperty SID | Select-Object Value -ExpandProperty Value
+$UserSIDs = Get-ADGroup -LDAPFilter "(Name=$GroupName)" | Get-ADGroupMember | Where-Object -Property objectClass -eq user | Select-Object SID -ExpandProperty SID | Select-Object Value -ExpandProperty Value
 
 # Single SID
 [string]$SID = $null
-[string]$SID = (Get-ADUser -Filter {SamAccountName -eq "Administrator"}).SID
-[string]$CSPpath = "C:\Program Files\Crypto Pro\CSP\"
+[string]$SID = (Get-ADUser -Filter {SamAccountName -eq $SourceUser}).SID
 
 # Root reg path for key containers
 [string]$RegRoot
@@ -49,3 +77,7 @@ $Keys = "\Keys"
 
 # Full hive
 $KeyHive = $RegRoot + $SID + $Keys
+
+$UserSIDs
+$PCnames
+$KeyHive

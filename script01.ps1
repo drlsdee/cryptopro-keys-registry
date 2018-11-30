@@ -30,7 +30,7 @@ IF ($SourceUser -eq $null) {
 $CSPpath = "C:\Program Files\Crypto Pro\CSP"
 
 # Check environment variable PATH and add path to "csptest.exe" if needed
-IF ($env:Path -notlike "Crypto Pro") {
+IF ($env:Path -notlike "*Crypto Pro*") {
     $env:PATH = $env:PATH + ";" + $CSPpath
     echo $env:PATH
     } ELSE {
@@ -54,7 +54,6 @@ $UserSIDs = Get-ADGroup -LDAPFilter "(Name=$GroupName)" | Get-ADGroupMember | Wh
 # Root reg path for key containers
 [string]$RegRoot
 
-
 IF ((Get-WmiObject Win32_OperatingSystem -ComputerName $PC).OSArchitecture -like "64*") {
     # Path to regkeys on x64
     $RegRoot = "HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Crypto Pro\Settings\Users\"
@@ -63,20 +62,30 @@ IF ((Get-WmiObject Win32_OperatingSystem -ComputerName $PC).OSArchitecture -like
         $RegRoot = "HKEY_LOCAL_MACHINE\SOFTWARE\Crypto Pro\Settings\Users\"
         }
 
-
 # End of path
-$Keys = "\Keys"
+$endOfPath = "\Keys"
 
 # Full hive
-$KeyHive = $RegRoot + $SID + $Keys
+$KeyHive = $RegRoot + $SID + $endOfPath
 
+# Export dir
+$exportDir = "C:\"
+
+# Read reg keys
 $RegQuery = reg query $KeyHive
 
-foreach ($R in $RegQuery) {
-    IF ($R -like $GroupName) {
-        $exportName = $R.Substring($KeyHive.Length+1)
+# Export reg keys
+FOREACH ($Rkey in $RegQuery) {
+    # Check match
+    IF ($Rkey -like $GroupName) {
+        # Trim name of reg key to use it in the name of the dest.file
+        $exportName = $Rkey.Substring($KeyHive.Length+1)
         echo $exportName
-        $exportPath = "C:\" + $exportName + ".reg"
-        reg export $R $exportPath
-        }
+        # Set the name of the dest. regfile
+        $exportPath = $exportDir + $exportName + ".reg"
+        # And export (overwrite accepted)
+        reg export $Rkey $exportPath /y
+        } ELSE {
+            echo "Nothing to do!"
+            }
     }

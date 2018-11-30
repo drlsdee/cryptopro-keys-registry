@@ -49,15 +49,12 @@ $DomainName = Get-ADDomain | Select-Object DistinguishedName -ExpandProperty Dis
 $CSPpath = "C:\Program Files\Crypto Pro\CSP"
 
 # Check environment variable PATH and add path to "csptest.exe" if needed
-IF ($env:Path -notlike "Crypto Pro") {
+IF ($env:Path -notlike "*Crypto Pro*") {
     $env:PATH = $env:PATH + ";" + $CSPpath
     echo $env:PATH
     } ELSE {
         echo $env:PATH
         }
-
-# Add to environment variable PATH
-# $env:PATH = $env:PATH + ";" + $CSPpath
 
 # Array with target PC names
 $PCnames = $null
@@ -77,7 +74,6 @@ $UserSIDs = Get-ADGroup -LDAPFilter "(Name=$GroupName)" | Get-ADGroupMember | Wh
 # Root reg path for key containers
 [string]$RegRoot
 
-
 IF ((Get-WmiObject Win32_OperatingSystem -ComputerName $PC).OSArchitecture -like "64*") {
     # Path to regkeys on x64
     $RegRoot = "HKLM:SOFTWARE\Wow6432Node\Crypto Pro\Settings\Users\"
@@ -88,10 +84,10 @@ IF ((Get-WmiObject Win32_OperatingSystem -ComputerName $PC).OSArchitecture -like
 
 
 # End of path
-$Keys = "\Keys"
+$endOfPath = "\Keys"
 
 # Full hive
-$KeyHive = $RegRoot + $SID + $Keys
+$KeyHive = $RegRoot + $SID + $endOfPath
 
 # Select hives with keys
 $Keys = Get-ChildItem $KeyHive |  Where-Object Name -Like $GroupName
@@ -99,3 +95,8 @@ $Keys = Get-ChildItem $KeyHive |  Where-Object Name -Like $GroupName
 $UserSIDs
 $PCnames
 $KeyHive
+
+foreach ($K in $Keys) {
+    $Kpath = $K.Name
+    Get-ItemProperty -Path Registry::$Kpath
+    }

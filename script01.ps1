@@ -43,6 +43,9 @@ $PCnames = Get-ADGroup -LDAPFilter "(Name=$GroupName)" | Get-ADGroupMember | Whe
 # Single PC
 $PC = $SourcePC
 
+# Userlogins
+$userLogins = Get-ADGroup -LDAPFilter "(Name=$GroupName)" | Get-ADGroupMember | Where-Object -Property objectClass -eq user | Select-Object SamAccountName -ExpandProperty SamAccountName
+
 # Array with SIDs
 $UserSIDs = $null
 $UserSIDs = Get-ADGroup -LDAPFilter "(Name=$GroupName)" | Get-ADGroupMember | Where-Object -Property objectClass -eq user | Select-Object SID -ExpandProperty SID | Select-Object Value -ExpandProperty Value
@@ -54,12 +57,15 @@ $UserSIDs = Get-ADGroup -LDAPFilter "(Name=$GroupName)" | Get-ADGroupMember | Wh
 # Root reg path for key containers
 [string]$RegRoot
 
+$RegRoot64 = "HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Crypto Pro\Settings\Users\"
+$RegRoot32 = "HKEY_LOCAL_MACHINE\SOFTWARE\Crypto Pro\Settings\Users\"
+
 IF ((Get-WmiObject Win32_OperatingSystem -ComputerName $PC).OSArchitecture -like "64*") {
     # Path to regkeys on x64
-    $RegRoot = "HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Crypto Pro\Settings\Users\"
+    $RegRoot = $RegRoot64
     } ELSE {
         # and x86
-        $RegRoot = "HKEY_LOCAL_MACHINE\SOFTWARE\Crypto Pro\Settings\Users\"
+        $RegRoot = $RegRoot32
         }
 
 # End of path
@@ -69,12 +75,13 @@ $endOfPath = "\Keys"
 $KeyHive = $RegRoot + $SID + $endOfPath
 
 # Export dir
-$exportDir = "C:\"
+$exportDir = "\\fs-00\dst$\reg\"
 
 # Read reg keys
 $RegQuery = reg query $KeyHive
 
 # Export reg keys
+$PC = $SourcePC
 FOREACH ($Rkey in $RegQuery) {
     # Check match
     IF ($Rkey -like $GroupName) {
@@ -82,10 +89,18 @@ FOREACH ($Rkey in $RegQuery) {
         $exportName = $Rkey.Substring($KeyHive.Length+1)
         echo $exportName
         # Set the name of the dest. regfile
-        $exportPath = $exportDir + $exportName + ".reg"
+        $exportPath = $exportDir + $exportName + "+" + $SourceUser + ".reg"
         # And export (overwrite accepted)
         reg export $Rkey $exportPath /y
         } ELSE {
             echo "Nothing to do!"
             }
+    }
+
+ForEach ($user in $userLogins) {
+    $SIDu = (Get-ADUser -Filter {SamAccountName -eq $user}).SID
+    echo $user
+    echo $SIDu
+    $exportPathU = $exportDir + $exportName + "+" + $user + ".reg"
+    (Get-ChildItem $exportDir | Get-Content).Replace($SID,$SIDu) | Set-Content $exportPathU
     }

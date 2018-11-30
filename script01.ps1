@@ -1,19 +1,4 @@
-﻿<#
-Задачи.
-Получить список пользователей домена, имеющих право использования контейнеров
-Конвертировать их имена в SID-ы
-Получить список ПК с установленной КриптоПро
-Записать в ветку реестра "HKLM\...\SID\Keys" список контейнеров
-Запустить "CSP\csptest.exe -absorb -certs"
-
-Входные параметры:
-Эталонный пользователь (если не задано, текущий)
-Эталонный компьютер (если не задано, текущий)
-Группа пользователей
-Назначение сертификатов (наименование сервиса - СУФД, Контур итп; наименование или иной ИД владельца; возможно, стоит связать с названием групп)
-Компьютеры (при распространении через SCCM - обойтись коллекциями?)
-#>
-# Set input parameters
+﻿# Set input parameters
 param (
         # Название сервиса, для которого используются ключи. "СУФД", "ЕИС", "Контур" и т.п. Должно содержаться как в названии контейнера, так и в названии группы.
         $ServiceName,
@@ -38,10 +23,6 @@ IF ($SourceUser -eq $null) {
     $SourceUser = $env:USERNAME
     }
 
-
-# DomainName
-$DomainName = Get-ADDomain | Select-Object DistinguishedName -ExpandProperty DistinguishedName
-
 # Group Name
 [string]$GroupName = "*" + $ServiceName + "*"
 
@@ -55,10 +36,6 @@ IF ($env:Path -notlike "Crypto Pro") {
     } ELSE {
         echo $env:PATH
         }
-
-# Add to environment variable PATH
-# $env:PATH = $env:PATH + ";" + $CSPpath
-
 # Array with target PC names
 $PCnames = $null
 $PCnames = Get-ADGroup -LDAPFilter "(Name=$GroupName)" | Get-ADGroupMember | Where-Object -Property objectClass -eq computer | Select-Object name -ExpandProperty name
@@ -80,10 +57,10 @@ $UserSIDs = Get-ADGroup -LDAPFilter "(Name=$GroupName)" | Get-ADGroupMember | Wh
 
 IF ((Get-WmiObject Win32_OperatingSystem -ComputerName $PC).OSArchitecture -like "64*") {
     # Path to regkeys on x64
-    $RegRoot = "HKLM:SOFTWARE\Wow6432Node\Crypto Pro\Settings\Users\"
+    $RegRoot = "HKLM\SOFTWARE\Wow6432Node\Crypto Pro\Settings\Users\"
     } ELSE {
         # and x86
-        $RegRoot = "HKLM:SOFTWARE\Crypto Pro\Settings\Users\"
+        $RegRoot = "HKLM\SOFTWARE\Crypto Pro\Settings\Users\"
         }
 
 
@@ -93,9 +70,4 @@ $Keys = "\Keys"
 # Full hive
 $KeyHive = $RegRoot + $SID + $Keys
 
-# Select hives with keys
-$Keys = Get-ChildItem $KeyHive |  Where-Object Name -Like $GroupName
-
-$UserSIDs
-$PCnames
 $KeyHive

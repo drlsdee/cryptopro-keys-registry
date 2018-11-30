@@ -57,10 +57,10 @@ $UserSIDs = Get-ADGroup -LDAPFilter "(Name=$GroupName)" | Get-ADGroupMember | Wh
 
 IF ((Get-WmiObject Win32_OperatingSystem -ComputerName $PC).OSArchitecture -like "64*") {
     # Path to regkeys on x64
-    $RegRoot = "HKLM\SOFTWARE\Wow6432Node\Crypto Pro\Settings\Users\"
+    $RegRoot = "HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Crypto Pro\Settings\Users\"
     } ELSE {
         # and x86
-        $RegRoot = "HKLM\SOFTWARE\Crypto Pro\Settings\Users\"
+        $RegRoot = "HKEY_LOCAL_MACHINE\SOFTWARE\Crypto Pro\Settings\Users\"
         }
 
 
@@ -70,4 +70,13 @@ $Keys = "\Keys"
 # Full hive
 $KeyHive = $RegRoot + $SID + $Keys
 
-$KeyHive
+$RegQuery = reg query $KeyHive
+
+foreach ($R in $RegQuery) {
+    IF ($R -like $GroupName) {
+        $exportName = $R.Substring($KeyHive.Length+1)
+        echo $exportName
+        $exportPath = "C:\" + $exportName + ".reg"
+        reg export $R $exportPath
+        }
+    }

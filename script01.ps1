@@ -1,19 +1,4 @@
-﻿<#
-Задачи.
-Получить список пользователей домена, имеющих право использования контейнеров
-Конвертировать их имена в SID-ы
-Получить список ПК с установленной КриптоПро
-Записать в ветку реестра "HKLM\...\SID\Keys" список контейнеров
-Запустить "CSP\csptest.exe -absorb -certs"
-
-Входные параметры:
-Эталонный пользователь (если не задано, текущий)
-Эталонный компьютер (если не задано, текущий)
-Группа пользователей
-Назначение сертификатов (наименование сервиса - СУФД, Контур итп; наименование или иной ИД владельца; возможно, стоит связать с названием групп)
-Компьютеры (при распространении через SCCM - обойтись коллекциями?)
-#>
-# Set input parameters
+﻿# Set input parameters
 param (
         # Название сервиса, для которого используются ключи. "СУФД", "ЕИС", "Контур" и т.п. Должно содержаться как в названии контейнера, так и в названии группы.
         $ServiceName,
@@ -38,10 +23,6 @@ IF ($SourceUser -eq $null) {
     $SourceUser = $env:USERNAME
     }
 
-
-# DomainName
-$DomainName = Get-ADDomain | Select-Object DistinguishedName -ExpandProperty DistinguishedName
-
 # Group Name
 [string]$GroupName = "*" + $ServiceName + "*"
 
@@ -55,7 +36,6 @@ IF ($env:Path -notlike "*Crypto Pro*") {
     } ELSE {
         echo $env:PATH
         }
-
 # Array with target PC names
 $PCnames = $null
 $PCnames = Get-ADGroup -LDAPFilter "(Name=$GroupName)" | Get-ADGroupMember | Where-Object -Property objectClass -eq computer | Select-Object name -ExpandProperty name
@@ -76,12 +56,11 @@ $UserSIDs = Get-ADGroup -LDAPFilter "(Name=$GroupName)" | Get-ADGroupMember | Wh
 
 IF ((Get-WmiObject Win32_OperatingSystem -ComputerName $PC).OSArchitecture -like "64*") {
     # Path to regkeys on x64
-    $RegRoot = "HKLM:SOFTWARE\Wow6432Node\Crypto Pro\Settings\Users\"
+    $RegRoot = "HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Crypto Pro\Settings\Users\"
     } ELSE {
         # and x86
-        $RegRoot = "HKLM:SOFTWARE\Crypto Pro\Settings\Users\"
+        $RegRoot = "HKEY_LOCAL_MACHINE\SOFTWARE\Crypto Pro\Settings\Users\"
         }
-
 
 # End of path
 $endOfPath = "\Keys"
@@ -89,14 +68,24 @@ $endOfPath = "\Keys"
 # Full hive
 $KeyHive = $RegRoot + $SID + $endOfPath
 
-# Select hives with keys
-$Keys = Get-ChildItem $KeyHive |  Where-Object Name -Like $GroupName
+# Export dir
+$exportDir = "C:\"
 
-$UserSIDs
-$PCnames
-$KeyHive
+# Read reg keys
+$RegQuery = reg query $KeyHive
 
-foreach ($K in $Keys) {
-    $Kpath = $K.Name
-    Get-ItemProperty -Path Registry::$Kpath
+# Export reg keys
+FOREACH ($Rkey in $RegQuery) {
+    # Check match
+    IF ($Rkey -like $GroupName) {
+        # Trim name of reg key to use it in the name of the dest.file
+        $exportName = $Rkey.Substring($KeyHive.Length+1)
+        echo $exportName
+        # Set the name of the dest. regfile
+        $exportPath = $exportDir + $exportName + ".reg"
+        # And export (overwrite accepted)
+        reg export $Rkey $exportPath /y
+        } ELSE {
+            echo "Nothing to do!"
+            }
     }

@@ -1,10 +1,13 @@
 ﻿$StartLocation = Get-Location
 $WrkDirName = "RegKeys"
-$WorkingDir = Join-Path -Path $StartLocation -ChildPath $WorkingDirName
+$WorkingDir = Join-Path -Path $StartLocation -ChildPath $WrkDirName
 $SrcDirName = "src"
 $SourceDir = Join-Path -Path $WorkingDir -ChildPath $SrcDirName
-$ODirName = "out"
-$OutDir = Join-Path -Path $WorkingDir -ChildPath $ODirName
+$ODirNameX86 = "x86out"
+$OutDirX86 = Join-Path -Path $WorkingDir -ChildPath $ODirNameX86
+$ODirNameX64 = "x64out"
+$OutDirX64 = Join-Path -Path $WorkingDir -ChildPath $ODirNameX64
+
 
 $SourceFiles = Get-ChildItem -Path $SourceDir -File -Filter "*.reg"
 
@@ -290,17 +293,18 @@ function Replace-SIDinRegFiles {
     Write-Verbose -Message "Start working..."
     if ($ExcludeWOW6432) {
         $SourceRegFiles.ForEach({
-            Replace-SIDinFile -SourceFile $_ -Destination $OutDir -Username $Username -SIDregex $Regex -ExcludeWOW6432
+            Replace-SIDinFile -SourceFile $_ -Destination $DestinationPath -Username $Username -SIDregex $Regex -ExcludeWOW6432
         })
     } else {
         $SourceRegFiles.ForEach({
-            Replace-SIDinFile -SourceFile $_ -Destination $OutDir -Username $Username -SIDregex $Regex
+            Replace-SIDinFile -SourceFile $_ -Destination $DestinationPath -Username $Username -SIDregex $Regex
         })
     }
 }
 
 $Usernames.ForEach({
-    Replace-SIDinRegFiles -SourcePath $SourceDir -DestinationPath $OutDir -Username $_ -ExcludeWOW6432
+    Replace-SIDinRegFiles -SourcePath $SourceDir -DestinationPath $OutDirX86 -Username $_ -ExcludeWOW6432
+    Replace-SIDinRegFiles -SourcePath $SourceDir -DestinationPath $OutDirX64 -Username $_
 })
 
 Write-Host -Object "===================================="

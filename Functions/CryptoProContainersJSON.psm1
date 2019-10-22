@@ -146,7 +146,7 @@ function Import-RegKeyFromObject {
         [Microsoft.Win32.RegistryKey]$newRegKey = New-Item -Path $regKeyPath -Force
         Write-Verbose -Message "$(Get-DateForLogs -fn $theFName) Key `"$($newRegKey.Name)`" created."
         Write-Verbose -Message "$(Get-DateForLogs -fn $theFName) Reading properties of input object..."
-        $propertyList = $InputObject.$PropertyName.PSObject.Properties.Name
+        [string[]]$propertyList = $InputObject.$PropertyName.PSObject.Properties.Name
         $propertyObject = $InputObject.$PropertyName
         foreach ($propName in $propertyList) {
             Write-Verbose -Message "$(Get-DateForLogs -fn $theFName) Property `"$propName`" found"
@@ -216,8 +216,8 @@ function Export-CryptoProContainersToJSON {
     foreach ($regCont in $regContainersExport) {
         $expObject = Export-RegKeyToObject -RegistryKey $regCont -KeyName $KeyName -PropertyName $PropertyName
         $expString = $expObject | ConvertTo-Json -Compress
-        $expFileName = "$($expObject.$KeyName).json"
-        $expFilePath = "$OutputFolder\$expFileName"
+        [string]$expFileName = ((($expObject.$KeyName -split ' ') -replace '[^\w+-.@_]','') -ne '') -join '_'
+        $expFilePath = "$OutputFolder\$expFileName.json"
         if ((Test-Path -Path $expFilePath -PathType Any) -and (-not $Force)) {
             Write-Warning -Message "$(Get-DateForLogs -fn $theFName) File `"$expFileName`" already exists in path `"$OutputFolder`". Skipping..."
         } else {
@@ -238,12 +238,12 @@ function Import-CryptoProContainersFromJSON {
         $Username = $env:USERNAME,
 
         [Parameter()]
-        # Path to output folder (default is current user's profile folder). MUST BE WRITABLE!
-        [string]
+        # Path to folder to import from (default is current user's profile folder).
+        [string[]]
         $InputFolder = $env:USERPROFILE,
 
         [Parameter()]
-        # Name of target container (if not set, all containers will be exported) #NOT USED NOW
+        # Name of target container (if not set, all containers will be imported) #NOT USED NOW
         [string]
         $ContainerName,
 
@@ -258,7 +258,7 @@ function Import-CryptoProContainersFromJSON {
         $PropertyName = 'Property',
 
         [Parameter()]
-        # Tries to write output file even if the file already exists
+        # Tries to write registry entry even if the entry already exists
         [switch]
         $Force
     )
